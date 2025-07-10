@@ -1,0 +1,7 @@
+[
+  {
+    "origin": ["https://returns-6ff02.web.app", "http://localhost:5173"],
+    "method": ["GET"],
+    "maxAgeSeconds": 3600
+  }
+]
