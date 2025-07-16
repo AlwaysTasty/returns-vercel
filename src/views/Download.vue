@@ -182,7 +182,7 @@ const fetchCsv = async () => {
   isLoading.returns = true;
   const returnsFolderRef = storageRef(storage, 'returns');
   csvFile.value = null;
-  csvContent.value = [];
+  csvRows.value = [];
 
   try {
     const res = await listAll(returnsFolderRef);
