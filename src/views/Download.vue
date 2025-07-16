@@ -101,7 +101,7 @@ import { formatTimestamp } from '../utils/formatters.js';
 // --- Reactive State ---
 const images = ref([]);
 const csvFile = ref(null);
-const csvContent = ref([]);
+const csvRows = ref([]);
 const isLoading = reactive({ images: true, returns: true });
 const statusMessage = ref('');
 const statusType = ref('');
