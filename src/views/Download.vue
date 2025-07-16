@@ -67,18 +67,18 @@
       <div v-else-if="!csvFile" class="empty-state">No returns file found for today.</div>
       <div v-else class="table-container">
         <h4>Preview: {{ csvFile.name }}</h4>
-        <table class="item-table csv-preview-table">
-          <thead>
-            <tr>
-              <th v-for="(header, index) in csvContent[0]" :key="index">{{ header }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(row, rowIndex) in csvContent.slice(1)" :key="rowIndex">
-              <td v-for="(cell, cellIndex) in row" :key="cellIndex">{{ cell }}</td>
-            </tr>
-          </tbody>
-        </table>
+          <table class="item-table csv-preview-table">
+            <thead v-if="csvHeaders.length > 0">
+              <tr>
+                <th v-for="(header, index) in csvHeaders" :key="index">{{ header }}</th>
+              </tr>
+            </thead>
+            <tbody v-if="csvBody.length > 0">
+              <tr v-for="(row, rowIndex) in csvBody" :key="rowIndex">
+                <td v-for="(cell, cellIndex) in row" :key="cellIndex">{{ cell }}</td>
+              </tr>
+            </tbody>
+          </table>
       </div>
     </div>
 
@@ -105,6 +105,17 @@ const csvContent = ref([]);
 const isLoading = reactive({ images: true, returns: true });
 const statusMessage = ref('');
 const statusType = ref('');
+
+// --- NEW: Defensive Computed Properties for CSV ---
+const csvHeaders = computed(() => {
+  // Return the first row as headers, or an empty array if no data exists
+  return csvRows.value.length > 0 ? csvRows.value[0] : [];
+});
+
+const csvBody = computed(() => {
+  // Return all rows except the first, or an empty array
+  return csvRows.value.length > 1 ? csvRows.value.slice(1) : [];
+});
 
 // --- Lifecycle Hook ---
 onMounted(() => {
@@ -145,21 +156,18 @@ const fetchImages = async () => {
 
     const allFiles = await Promise.all(filePromises);
 
-    // --- THE FIX IS HERE ---
-    
-    // 1. Get the current time.
+// --- NEW & ROBUST DATE LOGIC ---
     const now = new Date();
-    
-    // 2. Calculate the timestamp for exactly 24 hours ago from this moment.
-    const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+    const todayStr = now.toISOString().split('T')[0]; // "YYYY-MM-DD"
+    const yesterday = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
 
-    // 3. Filter the files based on the new time threshold.
     images.value = allFiles
       .filter(file => {
-        // The file's upload timestamp must be AFTER the cutoff time.
-        return file.uploadTimestamp >= twentyFourHoursAgo;
+        const fileDateStr = file.uploadTimestamp.toISOString().split('T')[0];
+        return fileDateStr === todayStr || fileDateStr === yesterdayStr;
       })
-      .sort((a, b) => b.uploadTimestamp - a.uploadTimestamp); // Keep the sort for newest first
+      .sort((a, b) => b.uploadTimestamp - a.uploadTimestamp);
 
   } catch (error) {
     console.error("Failed to load images:", error);
@@ -200,11 +208,12 @@ const fetchCsv = async () => {
     const text = await response.text();
 
     // NEW: Improved parsing logic
-    csvContent.value = text
+    csvRows.value = text
+      .trim()
       .split('\n')
-      .map(row => row.trim()) // Trim whitespace from each row
-      .filter(row => row && !row.startsWith('Terminal:') && !row.startsWith('===')) // Filter out empty lines and decorative headers
-      .map(row => row.split(',').map(cell => cell.replace(/"/g, ''))); // Split into cells and remove quotes
+      .map(row => row.trim())
+      .filter(row => row && !row.startsWith('Terminal:') && !row.startsWith('==='))
+      .map(row => row.split(',').map(cell => cell.replace(/"/g, '')));
 
   } catch (error) {
     console.error("Failed to load CSV:", error);
