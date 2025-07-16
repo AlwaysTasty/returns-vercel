@@ -93,7 +93,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, reactive } from 'vue';
+import { ref, onMounted, reactive,computed } from 'vue';
 import { storage } from '../services/firebase';
 import { listAll, getDownloadURL, getMetadata, deleteObject, ref as storageRef } from 'firebase/storage';
 import { formatTimestamp } from '../utils/formatters.js';
