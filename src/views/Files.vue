@@ -47,7 +47,9 @@
         <div v-else class="preview-wrapper">
           <div class="preview-header">
             <span class="preview-filename">{{ selectedFile.name }}</span>
-            <a :href="selectedFile.url" :download="selectedFile.name" class="btn btn-secondary btn-small">Download</a>
+           <button @click="handleDownload(selectedFile)" class="btn btn-secondary btn-small">
+              {{ isDownloading ? 'Downloading...' : 'Download' }}
+            </button>
           </div>
 
           <div class="preview-content">
@@ -73,6 +75,47 @@ import { ref, onMounted } from 'vue';
 import { storage } from '../services/firebase';
 import { listAll, getMetadata, getDownloadURL, deleteObject, ref as storageRef } from 'firebase/storage';
 import { formatFileSize, formatTimestamp } from '../utils/formatters.js';
+
+const isDownloading = ref(false); 
+
+
+const handleDownload = async (file) => {
+  if (!file || !file.url) return;
+  isDownloading.value = true;
+  
+  try {
+    // 1. Fetch the file data using the download URL.
+    //    Because of CORS, this works for images just like it did for the CSV.
+    const response = await fetch(file.url);
+    if (!response.ok) throw new Error('Network response was not ok.');
+    
+    // 2. Get the data as a Blob (a file-like object).
+    const blob = await response.blob();
+    
+    // 3. Create a temporary URL that points to the Blob data in the browser's memory.
+    const blobUrl = window.URL.createObjectURL(blob);
+    
+    // 4. Create a temporary, hidden link element.
+    const link = document.createElement('a');
+    link.style.display = 'none';
+    link.href = blobUrl;
+    link.setAttribute('download', file.name); // Set the desired filename
+    
+    // 5. Add the link to the document, "click" it to trigger the download, then remove it.
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // 6. Clean up the temporary Blob URL.
+    window.URL.revokeObjectURL(blobUrl);
+
+  } catch (error) {
+    console.error("Download failed:", error);
+    alert("Could not download the file. See console for details.");
+  } finally {
+    isDownloading.value = false;
+  }
+};
 
 const allFiles = ref([]);
 const selectedFile = ref(null);
@@ -172,8 +215,7 @@ const handleFileSelect = async (file) => {
     isLoadingPreview.value = false;
   }
 };
-// Replace old formatDate with formatTimestamp from utils, but it's already used.
-// Let's just remove the old one.
+
 // const formatDate = (date) => date ? date.toLocaleDateString() : 'N/A';
 </script>
 
