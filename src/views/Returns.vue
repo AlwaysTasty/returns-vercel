@@ -209,10 +209,6 @@ const uploadReturns = async () => {
   try {
     await uploadString(storageRef(storage, filename), csvContent, 'raw', { contentType: 'text/csv' });
     setUploadStatus(`✅ Successfully uploaded!`, 'success');
-    
-    // NEW: Clear cache and reset form after successful upload
-    localStorage.removeItem(localStorageKey);
-    terminals.value = createDefaultTerminals();
 
   } catch (error) {
     console.error("Upload failed:", error);
