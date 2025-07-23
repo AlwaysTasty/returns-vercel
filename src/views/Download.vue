@@ -44,7 +44,9 @@
                 <p>{{ image.remarks || '–' }}</p>
               </td>
               <td class="text-right">
-                <a :href="image.url" :download="image.name" class="btn btn-small">Download</a>
+                <button @click="triggerDownload(image)" class="btn btn-small">
+                  Download
+                </button>
               </td>
             </tr>
           </tbody>
@@ -96,7 +98,7 @@
 import { ref, onMounted, reactive,computed } from 'vue';
 import { storage } from '../services/firebase';
 import { listAll, getDownloadURL, getMetadata, deleteObject, ref as storageRef } from 'firebase/storage';
-import { formatTimestamp } from '../utils/formatters.js';
+import { formatTimestamp, forceFileDownload } from '../utils/formatters.js';
 
 // --- Reactive State ---
 const images = ref([]);
@@ -128,6 +130,12 @@ const setStatus = (message, type, duration = 4000) => {
   statusMessage.value = message;
   statusType.value = type;
   setTimeout(() => statusMessage.value = '', duration);
+};
+
+
+const triggerDownload = (image) => {
+  setStatus(`Preparing to download ${image.name}...`, 'info', 2000);
+  forceFileDownload(image.url, image.name);
 };
 
 // --- Core Fetching Logic ---
@@ -223,8 +231,7 @@ const fetchCsv = async () => {
   }
 };
 
-// --- Action Methods ---
-// Located in /src/views/Download.vue
+
 
 const clearFolder = async (folderPath) => {
   // We only handle the 'images' case for this special logic
@@ -284,6 +291,21 @@ const clearFolder = async (folderPath) => {
     }
   }
 };
+
+const downloadAllImages = async () => {
+  if (!images.value.length) return;
+  
+  setStatus(`Starting batch download of ${images.value.length} images...`, 'info');
+
+  for (const image of images.value) {
+    // We now call the global, imported helper function
+    await forceFileDownload(image.url, image.name);
+    await new Promise(resolve => setTimeout(resolve, 300));
+  }
+
+  setStatus('✅ Batch download complete!', 'success');
+};
+
 </script>
 
 <style scoped>

@@ -63,7 +63,7 @@
               <p><strong>By:</strong> {{ image.uploaderEmail.split('@')[0] }}</p>
               <p><strong>On:</strong> {{ formatTimestamp(new Date(image.uploadTimestamp)) }}</p>
               <div class="image-actions">
-                <a :href="image.url" class="btn btn-small" download>Download</a>
+                <button @click="forceFileDownload(image.url, image.name)" class="btn btn-small">Download</button>
                 <button @click="deleteImage(image.path)" class="btn btn-small btn-danger">Delete</button>
               </div>
             </div>
@@ -87,7 +87,7 @@ import { collection, query, where, onSnapshot, addDoc, updateDoc, serverTimestam
 import { listAll, getDownloadURL, getMetadata, ref as storageRef, deleteObject } from 'firebase/storage';
 import TiptapEditor from '../components/TiptapEditor.vue';
 import debounce from 'lodash.debounce';
-import { formatTimestamp } from '../utils/formatters.js';
+import { formatTimestamp, forceFileDownload } from '../utils/formatters.js';
 import RecycleBinModal from '../components/RecycleBinModal.vue';
 
 const { user } = useAuth();

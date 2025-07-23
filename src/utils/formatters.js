@@ -40,3 +40,33 @@ export function formatFileSize(bytes) {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 }
+
+
+/**
+ * Fetches a file from a URL as a Blob and triggers a browser download.
+ * @param {string} url - The direct URL to the file.
+ * @param {string} fileName - The desired name for the downloaded file.
+ */
+export async function forceFileDownload(url, fileName) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Network response was not ok: ${response.statusText}`);
+
+    const blob = await response.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(blobUrl);
+
+  } catch (error) {
+    console.error('Download failed:', error);
+    // You can add a user-facing error notification here if you wish
+    alert(`Failed to download ${fileName}. Please check the console for details.`);
+  }
+}
