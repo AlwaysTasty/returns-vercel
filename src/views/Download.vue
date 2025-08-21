@@ -29,7 +29,7 @@
             </div>
             <div class="image-actions">
               <!-- NEW: Copy Image Button -->
-              <button @click="copyImageToClipboard(image)" class="btn btn-secondary btn-small">Copy</button>
+              <button @click="handleCopyClick(image)" class="btn btn-secondary btn-small">Copy</button>
               <button @click="triggerDownload(image)" class="btn btn-primary btn-small">Download</button>
             </div>
           </div>
@@ -81,7 +81,7 @@
 import { ref, onMounted, reactive,computed } from 'vue';
 import { storage } from '../services/firebase';
 import { listAll, getDownloadURL, getMetadata, deleteObject, ref as storageRef } from 'firebase/storage';
-import { formatTimestamp, forceFileDownload } from '../utils/formatters.js';
+import { formatTimestamp, forceFileDownload, copyImageToClipboard } from '../utils/formatters.js';
 
 // --- Reactive State ---
 const images = ref([]);
@@ -113,6 +113,16 @@ const setStatus = (message, type, duration = 4000) => {
   statusMessage.value = message;
   statusType.value = type;
   setTimeout(() => statusMessage.value = '', duration);
+};
+
+const handleCopyClick = async (image) => {
+  setStatus(`Copying ${image.name}...`, 'info', 3000);
+  const success = await copyImageToClipboard(image.url);
+  if (success) {
+    setStatus(`✅ Image copied to clipboard!`, 'success');
+  } else {
+    setStatus('❌ Could not copy image. Check console for details.', 'error');
+  }
 };
 
 

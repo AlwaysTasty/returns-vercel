@@ -70,3 +70,31 @@ export async function forceFileDownload(url, fileName) {
     alert(`Failed to download ${fileName}. Please check the console for details.`);
   }
 }
+
+/**
+ * Fetches an image from a URL and copies it to the user's clipboard.
+ * @param {string} url - The direct URL to the image.
+ * @returns {Promise<boolean>} - A promise that resolves to true on success, false on failure.
+ */
+export async function copyImageToClipboard(url) {
+  if (!navigator.clipboard?.write) {
+    console.error("Clipboard API not supported or write access denied.");
+    return false;
+  }
+  
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("Failed to fetch image for copying.");
+    
+    const blob = await response.blob();
+    
+    await navigator.clipboard.write([
+      new ClipboardItem({ [blob.type]: blob })
+    ]);
+    
+    return true; // Indicate success
+  } catch (error) {
+    console.error('Failed to copy image:', error);
+    return false; // Indicate failure
+  }
+}

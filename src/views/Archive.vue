@@ -63,6 +63,7 @@
               <p><strong>By:</strong> {{ image.uploaderEmail.split('@')[0] }}</p>
               <p><strong>On:</strong> {{ formatTimestamp(new Date(image.uploadTimestamp)) }}</p>
               <div class="image-actions">
+                <button @click="handleCopyClick(image)" class="btn btn-small">Copy</button>
                 <button @click="forceFileDownload(image.url, image.name)" class="btn btn-small">Download</button>
                 <button @click="deleteImage(image.path)" class="btn btn-small btn-danger">Delete</button>
               </div>
@@ -87,7 +88,7 @@ import { collection, query, where, onSnapshot, addDoc, updateDoc, serverTimestam
 import { listAll, getDownloadURL, getMetadata, ref as storageRef, deleteObject } from 'firebase/storage';
 import TiptapEditor from '../components/TiptapEditor.vue';
 import debounce from 'lodash.debounce';
-import { formatTimestamp, forceFileDownload } from '../utils/formatters.js';
+import { formatTimestamp, forceFileDownload, copyImageToClipboard } from '../utils/formatters.js';
 import RecycleBinModal from '../components/RecycleBinModal.vue';
 
 const { user } = useAuth();
@@ -210,6 +211,16 @@ const deleteImage = async (imagePath) => {
     await deleteObject(storageRef(storage, imagePath));
     images.value = images.value.filter(img => img.path !== imagePath);
   } catch (e) { console.error("Error deleting image: ", e); }
+};
+
+const handleCopyClick = async (image) => {
+  // We can add a status message system to Archive.vue later if desired.
+  // For now, we'll rely on the alert fallback inside the helper.
+  alert(`Attempting to copy ${image.name}...`);
+  const success = await copyImageToClipboard(image.url);
+  if (success) {
+    alert("Image copied to clipboard!");
+  }
 };
 
 // --- Utility: Relative Time Formatter ---
