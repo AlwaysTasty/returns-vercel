@@ -16,41 +16,24 @@
 
       <div v-if="isLoading.images" class="loading-state">Loading images...</div>
       <div v-else-if="!images.length" class="empty-state">No images found from today or yesterday.</div>
-      <div v-else class="table-container">
-        <table class="item-table">
-          <thead>
-            <tr>
-              <th>Preview</th>
-              <th>Details</th>
-              <th>Remarks</th>
-              <th class="text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="image in images" :key="image.path">
-              <td>
-                <a :href="image.url" target="_blank" title="View full image">
-                  <img :src="image.url" :alt="image.name" class="preview-img" />
-                </a>
-              </td>
-              <td>
-                <div class="file-details">
-                  <strong class="file-name">{{ image.name }}</strong>
-                  <span class="meta-item"><strong>Uploaded by:</strong> {{ image.uploaderEmail.split('@')[0] }}</span>
-                  <span class="meta-item"><strong>On:</strong> {{ formatTimestamp(image.uploadTimestamp) }}</span>
-                </div>
-              </td>
-              <td class="remarks-cell">
-                <p>{{ image.remarks || '–' }}</p>
-              </td>
-              <td class="text-right">
-                <button @click="triggerDownload(image)" class="btn btn-small">
-                  Download
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="image-grid-container">
+        <div v-for="image in images" :key="image.path" class="image-display-card">
+          <!-- The full-size image is now the main content -->
+          <img :src="image.url" :alt="image.name" class="full-preview-img" />
+          
+          <div class="image-details-footer">
+            <div class="file-info">
+              <strong class="file-name">{{ image.name }}</strong>
+              <span class="meta-item">By {{ image.uploaderEmail.split('@')[0] }} on {{ formatTimestamp(image.uploadTimestamp) }}</span>
+              <p v-if="image.remarks" class="remarks-text">"{{ image.remarks }}"</p>
+            </div>
+            <div class="image-actions">
+              <!-- NEW: Copy Image Button -->
+              <button @click="copyImageToClipboard(image)" class="btn btn-secondary btn-small">Copy</button>
+              <button @click="triggerDownload(image)" class="btn btn-primary btn-small">Download</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -306,6 +289,31 @@ const downloadAllImages = async () => {
   setStatus('✅ Batch download complete!', 'success');
 };
 
+const copyImageToClipboard = async (image) => {
+  if (!navigator.clipboard || !navigator.clipboard.write) {
+    setStatus('❌ Browser does not support copying images.', 'error');
+    return;
+  }
+  
+  try {
+    setStatus(`Copying ${image.name}...`, 'info', 2000);
+    // Fetch the image data as a blob
+    const response = await fetch(image.url);
+    const blob = await response.blob();
+    
+    // Use the Clipboard API to write the blob
+    await navigator.clipboard.write([
+      new ClipboardItem({ [blob.type]: blob })
+    ]);
+    
+    setStatus(`✅ Image copied to clipboard!`, 'success');
+  } catch (error) {
+    console.error('Failed to copy image:', error);
+    setStatus('❌ Could not copy image. Check console for details.', 'error');
+  }
+};
+
+
 </script>
 
 <style scoped>
@@ -340,118 +348,73 @@ const downloadAllImages = async () => {
   background-color: var(--background-secondary);
   border-radius: 8px;
 }
-
-.table-container {
-  overflow-x: auto;
+.image-grid-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 1.5rem;
 }
-
-.item-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0 0.5rem;
-}
-
-.item-table th {
-  text-align: left;
-  padding: 0.75rem 1rem;
-  color: var(--text-secondary);
-  font-weight: 600;
-  font-size: 0.9rem;
-  text-transform: uppercase;
-  border-bottom: 2px solid var(--border-color);
-}
-
-.item-table td {
+.image-display-card {
   background-color: var(--background-secondary);
-  padding: 0.75rem 1rem;
-  vertical-align: middle;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
 }
-.item-table tr:hover td {
-  background-color: #313138;
-}
-
-/* Rounded corners for table rows */
-.item-table td:first-child { border-radius: 8px 0 0 8px; }
-.item-table td:last-child { border-radius: 0 8px 8px 0; }
-
-.preview-img {
-  max-width: 120px;
-  height: 80px;
-  object-fit: cover;
-  border-radius: 6px;
+.full-preview-img {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: contain; /* Use 'contain' to show the full image without cropping */
+  background-color: var(--background-primary); /* Dark background for transparent images */
   display: block;
-  transition: transform 0.2s ease;
 }
-.preview-img:hover {
-  transform: scale(1.1);
+.image-details-footer {
+  padding: 1rem;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
 }
-
-.file-name {
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 0.9rem;
-  word-break: break-all;
-}
-.text-right {
-  text-align: right;
-}
-
-.btn-small {
-  padding: 0.4rem 0.8rem;
-  font-size: 0.9rem;
-  background-color: #4a4a52;
-  text-decoration: none;
-  display: inline-block;
-}
-.btn-small:hover {
-  background-color: #5a5a64;
-}
-
-.status-message {
-  position: fixed;
-  bottom: 2rem;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  color: white;
-  font-weight: 500;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-  z-index: 1000;
-}
-.status-message.success { background-color: #107c10; }
-.status-message.error { background-color: #d13438; }
-.status-message.info { background-color: var(--accent-primary); }
-
-.fade-enter-active, .fade-leave-active {
-  transition: opacity 0.5s, transform 0.5s;
-}
-.fade-enter-from, .fade-leave-to {
-  opacity: 0;
-  transform: translateX(-50%) translateY(20px);
-}
-
-.file-details {
+.file-info {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  flex-grow: 1;
+  min-width: 0; /* Allows flex items to shrink properly */
 }
 .file-name {
   font-weight: 600;
-  font-size: 1rem;
   color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .meta-item {
   font-size: 0.85rem;
   color: var(--text-secondary);
 }
-.remarks-cell p {
-  margin: 0;
+.remarks-text {
+  margin: 0.5rem 0 0;
   font-style: italic;
+  font-size: 0.9rem;
   color: var(--text-secondary);
-  max-width: 300px; /* Limit width */
-  white-space: pre-wrap; /* Allow wrapping */
+  white-space: pre-wrap;
 }
-
+.image-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+.btn-small {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  min-width: 90px;
+  text-align: center;
+}
+.btn-primary { background-color: var(--accent-primary); }
+.btn-secondary { background-color: #4a4a52; }
 .csv-preview-table {
   border-collapse: collapse; /* Switch to collapse for borders */
   border-spacing: 0;
