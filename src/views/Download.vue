@@ -299,30 +299,6 @@ const downloadAllImages = async () => {
   setStatus('✅ Batch download complete!', 'success');
 };
 
-const copyImageToClipboard = async (image) => {
-  if (!navigator.clipboard || !navigator.clipboard.write) {
-    setStatus('❌ Browser does not support copying images.', 'error');
-    return;
-  }
-  
-  try {
-    setStatus(`Copying ${image.name}...`, 'info', 2000);
-    // Fetch the image data as a blob
-    const response = await fetch(image.url);
-    const blob = await response.blob();
-    
-    // Use the Clipboard API to write the blob
-    await navigator.clipboard.write([
-      new ClipboardItem({ [blob.type]: blob })
-    ]);
-    
-    setStatus(`✅ Image copied to clipboard!`, 'success');
-  } catch (error) {
-    console.error('Failed to copy image:', error);
-    setStatus('❌ Could not copy image. Check console for details.', 'error');
-  }
-};
-
 
 </script>
 
