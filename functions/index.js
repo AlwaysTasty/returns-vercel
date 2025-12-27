@@ -29,16 +29,128 @@
 
 // Use the v2 syntax for modern functions
 const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { defineSecret } = require('firebase-functions/params'); 
 const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
+const axios = require("axios");
+const { Telegraf } = require("telegraf");
+const { onRequest, onCall } = require("firebase-functions/v2/https");
 
 admin.initializeApp();
 const db = admin.firestore();
+const bucket = admin.storage().bucket();
 
-// This is the new, correct syntax for a scheduled function
+const telegramToken = defineSecret('TELEGRAM_TOKEN'); 
+
+let bot = null;
+
+exports.linkTelegramAccount = onCall({ region: "asia-southeast1" }, async (request) => {
+  // Ensure the user is logged into the website
+  if (!request.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+  }
+
+  const telegramId = request.data.telegramId;
+  const username = request.data.username || 'Unknown';
+  const email = request.auth.token.email;
+
+  // Save the link in a 'telegram_links' collection
+  // Document ID is the Telegram User ID (e.g., "123456789")
+  await db.collection("telegram_links").doc(String(telegramId)).set({
+    firebaseUid: request.auth.uid,
+    email: email,
+    telegramUsername: username,
+    linkedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+
+  return { success: true, email: email };
+});
+
+
+const getBot = () => {
+  if (bot) return bot;
+  bot = new Telegraf(telegramToken.value());
+
+  // Command to generate the login link
+  bot.command('start', (ctx) => {
+    const telegramId = ctx.from.id;
+    const username = ctx.from.username || '';
+    // Replace with your actual hosted URL
+    const webUrl = `https://returnscoi.vercel.app/settings?tgId=${telegramId}&tgName=${username}`;
+    
+    ctx.reply(`🔗 To verify your account, please click this link and confirm on the website:\n\n${webUrl}`);
+  });
+
+  bot.on("photo", async (ctx) => {
+    const telegramId = ctx.from.id;
+
+    try {
+      // CHECK: Look up the link in Firestore
+      const linkDoc = await db.collection("telegram_links").doc(String(telegramId)).get();
+
+      if (!linkDoc.exists) {
+        return ctx.reply("⛔ Account not linked. Please type /start to get a verification link.");
+      }
+
+      const userData = linkDoc.data();
+      
+      // If linked, proceed with upload...
+      const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+      const fileLink = await ctx.telegram.getFileLink(fileId);
+      
+      await ctx.reply(`Authenticated as ${userData.email}. Uploading...`);
+
+      const response = await axios({
+        url: fileLink.href,
+        method: "GET",
+        responseType: "arraybuffer",
+      });
+
+      const timestamp = new Date();
+      const fileName = `images/telegram_${timestamp.getTime()}.jpg`;
+      const file = bucket.file(fileName);
+
+      await file.save(response.data, {
+        metadata: {
+          contentType: "image/jpeg",
+          metadata: {
+            // Use the email from the Firebase Auth link
+            uploaderEmail: userData.email, 
+            uploadTimestamp: timestamp.toISOString(),
+            remarks: ctx.message.caption || "",
+            telegramUserId: String(telegramId)
+          },
+        },
+      });
+
+      await ctx.reply("✅ Success! Image uploaded.");
+    } catch (error) {
+      logger.error("Error:", error);
+      await ctx.reply("❌ Upload failed.");
+    }
+  });
+
+  return bot;
+};
+
+// --- 3. The Webhook Function ---
+// Now that telegramToken is a defineSecret(), passing it here is valid.
+exports.telegramWebhook = onRequest(
+  { region: "asia-southeast1", secrets: [telegramToken] }, 
+  async (req, res) => {
+    try {
+      const myBot = getBot();
+      await myBot.handleUpdate(req.body);
+    } catch (e) {
+      logger.error("Webhook processing error", e);
+    } finally {
+      res.status(200).end();
+    }
+  }
+);
+
+// --- 4. Cleanup Function (v2 Syntax - Kept from previous steps) ---
 exports.cleanupDeletedNotes = onSchedule("every 24 hours", async (event) => {
-  logger.log("Running scheduled note cleanup v2.");
-
   const now = admin.firestore.Timestamp.now();
   const sevenDaysAgo = admin.firestore.Timestamp.fromMillis(now.toMillis() - 7 * 24 * 60 * 60 * 1000);
 
@@ -48,16 +160,10 @@ exports.cleanupDeletedNotes = onSchedule("every 24 hours", async (event) => {
 
   const snapshot = await oldDeletedNotesQuery.get();
 
-  if (snapshot.empty) {
-    logger.log("No old deleted notes to clean up.");
-    return;
-  }
+  if (snapshot.empty) return;
 
   const batch = db.batch();
-  snapshot.docs.forEach((doc) => {
-    batch.delete(doc.ref);
-  });
-
+  snapshot.docs.forEach((doc) => batch.delete(doc.ref));
   await batch.commit();
   logger.log(`Successfully deleted ${snapshot.size} old note(s).`);
 });

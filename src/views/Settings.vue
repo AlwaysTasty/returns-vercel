@@ -1,4 +1,17 @@
 <template>
+  <!-- Telegram login page -->
+  <div class="card" v-if="telegramParams.id">
+      <h2>🔗 Connect Telegram</h2>
+      <p>Do you want to link the Telegram account <strong>{{ telegramParams.username || telegramParams.id }}</strong> to your current account ({{ user?.email }})?</p>
+      
+      <div class="actions">
+        <button class="btn btn-primary" @click="linkTelegram" :disabled="isLinking">
+          {{ isLinking ? 'Linking...' : 'Yes, Link Account' }}
+        </button>
+      </div>
+      <p v-if="linkMessage" class="status-message" :class="linkStatus">{{ linkMessage }}</p>
+    </div>
+
   <div>
     <!-- Card 1: Account Settings -->
     <div class="card" v-motion-fade-visible-once>
@@ -35,18 +48,72 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, watch } from 'vue';
 import { useAuth } from '../composables/useAuth';
+import { useRoute, useRouter } from 'vue-router'; // Import route tools
 import { updatePassword, deleteUser } from 'firebase/auth';
-import { useRouter } from 'vue-router';
+import { httpsCallable } from 'firebase/functions'; // Import functions
+import { functions } from '../services/firebase'; // Import your functions instance
 
 const { user } = useAuth();
+const route = useRoute();
 const router = useRouter();
 
+// Password/Account State
 const newPassword = ref('');
 const isLoading = ref(false);
 const statusMessage = ref('');
-const statusType = ref(''); // 'success' or 'error'
+const statusType = ref('');
+
+// Telegram Linking State
+const telegramParams = ref({ id: null, username: null });
+const isLinking = ref(false);
+const linkMessage = ref('');
+const linkStatus = ref('');
+
+watch(
+  () => route.query,
+  (newQuery) => {
+    console.log("Current URL Query Params:", newQuery); // Debug log
+
+    if (newQuery.tgId) {
+      console.log("Found Telegram ID:", newQuery.tgId); // Debug log
+      telegramParams.value = {
+        id: newQuery.tgId,
+        username: newQuery.tgName
+      };
+    }
+  },
+  { immediate: true } // This ensures it runs immediately when the page loads
+);
+
+const linkTelegram = async () => {
+  isLinking.value = true;
+  try {
+    const linkFunction = httpsCallable(functions, 'linkTelegramAccount');
+    await linkFunction({ 
+      telegramId: telegramParams.value.id,
+      username: telegramParams.value.username
+    });
+    
+    linkMessage.value = "✅ Telegram linked successfully! You can now upload images.";
+    linkStatus.value = "success";
+    
+    // Clear URL params to clean up
+    setTimeout(() => {
+      // Use 'replace' to remove query params without refreshing
+      router.replace({ path: '/settings', query: {} }); 
+      telegramParams.value = { id: null, username: null };
+    }, 3000);
+    
+  } catch (error) {
+    console.error("Linking failed", error);
+    linkMessage.value = "❌ Linking failed: " + error.message;
+    linkStatus.value = "error";
+  } finally {
+    isLinking.value = false;
+  }
+};
 
 
 // --- Methods ---
