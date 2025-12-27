@@ -81,6 +81,10 @@ const getBot = () => {
     ctx.reply(`🔗 To verify your account, please click this link and confirm on the website:\n\n${webUrl}`);
   });
 
+    bot.command('help', (ctx) => 
+    ctx.reply(`Click /start to verify your Telegram account via logging into the Returns website, then you can start using the bot by sending images to it to upload it!`)
+  );
+
   bot.on("photo", async (ctx) => {
     const telegramId = ctx.from.id;
 
